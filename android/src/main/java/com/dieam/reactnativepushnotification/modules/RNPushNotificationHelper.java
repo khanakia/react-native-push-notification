@@ -1,6 +1,7 @@
 package com.dieam.reactnativepushnotification.modules;
 
 
+import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.app.Application;
 import android.app.Notification;
@@ -15,6 +16,7 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -27,6 +29,8 @@ import com.facebook.react.bridge.ReadableMap;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.io.Console;
+import java.nio.channels.Channel;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -280,7 +284,7 @@ public class RNPushNotificationHelper {
             bundle.putBoolean("userInteraction", true);
             intent.putExtra("notification", bundle);
 
-            if (!bundle.containsKey("playSound") || bundle.getBoolean("playSound")) {
+            if (bundle.containsKey("playSound") && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)) {
                 Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                 String soundName = bundle.getString("soundName");
                 if (soundName != null) {
@@ -301,6 +305,7 @@ public class RNPushNotificationHelper {
                         soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/" + resId);
                     }
                 }
+                Log.d("Nik","abc");
                 notification.setSound(soundUri);
             }
 
@@ -326,7 +331,7 @@ public class RNPushNotificationHelper {
                     PendingIntent.FLAG_UPDATE_CURRENT);
 
             NotificationManager notificationManager = notificationManager();
-            checkOrCreateChannel(notificationManager);
+            checkOrCreateChannel(notificationManager,bundle);
 
             notification.setContentIntent(pendingIntent);
 
@@ -551,7 +556,14 @@ public class RNPushNotificationHelper {
     }
 
     private static boolean channelCreated = false;
-    private void checkOrCreateChannel(NotificationManager manager) {
+    private void checkOrCreateChannel(NotificationManager manager,Bundle bundle1) {
+        String soundName = bundle1.getString("soundName");
+        int resId;
+        Uri soundUri =null;
+        if (soundName != null) {
+           resId  = context.getResources().getIdentifier(soundName, "raw", context.getPackageName());
+           soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/" + resId);
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
             return;
         if (channelCreated)
@@ -592,12 +604,18 @@ public class RNPushNotificationHelper {
             }
         }
 
+        AudioAttributes attributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build();
+
         NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, this.config.getChannelName() != null ? this.config.getChannelName() : "rn-push-notification-channel", importance);
 
         channel.setDescription(this.config.getChannelDescription());
         channel.enableLights(true);
         channel.enableVibration(true);
-
+        if(bundle1.containsKey("playSound")) {
+            channel.setSound(soundUri, attributes);
+        }
         manager.createNotificationChannel(channel);
         channelCreated = true;
     }
